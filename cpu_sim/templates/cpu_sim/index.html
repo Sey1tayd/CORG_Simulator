@@ -1,0 +1,2479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPU Pipeline Simulator</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Core Colors - Pure Black Theme */
+            --bg-primary: #000000;
+            --bg-secondary: #0a0a0a;
+            --bg-tertiary: #111111;
+            --bg-elevated: #161616;
+            --bg-hover: #1a1a1a;
+            
+            /* Borders & Lines */
+            --border-primary: #1a1a1a;
+            --border-secondary: #2a2a2a;
+            --border-focus: #58a6ff;
+            
+            /* Text Colors */
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --text-accent: #58a6ff;
+            
+            /* Stage Colors - Vibrant but cohesive */
+            --stage-if: #3b82f6;      /* Blue */
+            --stage-id: #22c55e;      /* Green */
+            --stage-ex: #f59e0b;      /* Amber */
+            --stage-mem: #a855f7;     /* Purple */
+            --stage-wb: #ef4444;      /* Red */
+            
+            /* Accent Colors */
+            --accent-primary: #58a6ff;
+            --accent-success: #3fb950;
+            --accent-warning: #d29922;
+            --accent-danger: #f85149;
+            --accent-cyan: #39d4e8;
+            
+            /* Shadows */
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+            --shadow-glow: 0 0 20px rgba(88, 166, 255, 0.15);
+            
+            /* Transitions */
+            --transition-fast: 0.15s ease;
+            --transition-normal: 0.25s ease;
+            --transition-slow: 0.4s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-secondary);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+        ::-webkit-scrollbar-corner {
+            background: var(--bg-primary);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ===== CONTROLS BAR ===== */
+        .controls-bar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px 24px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-primary);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 2px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 2px;
+        }
+
+        button {
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+            border-radius: 6px;
+            transition: var(--transition-fast);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        button:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button.primary {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+        }
+
+        button.primary:hover {
+            background: #79b8ff;
+            box-shadow: 0 0 12px rgba(88, 166, 255, 0.3);
+        }
+
+        button.success {
+            background: var(--accent-success);
+            color: var(--bg-primary);
+        }
+
+        button.success:hover {
+            background: #56d364;
+        }
+
+        button.danger {
+            background: transparent;
+            color: var(--accent-danger);
+            border: 1px solid var(--accent-danger);
+        }
+
+        button.danger:hover {
+            background: rgba(248, 81, 73, 0.15);
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-left: 16px;
+            border-left: 1px solid var(--border-primary);
+        }
+
+        .speed-control label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100px;
+            height: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(88, 166, 255, 0.4);
+            transition: var(--transition-fast);
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        .speed-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--accent-primary);
+            min-width: 50px;
+        }
+
+        /* ===== MAIN LAYOUT ===== */
+        .main {
+            display: grid;
+            grid-template-columns: 600px 1fr 300px;
+            grid-template-rows: 1fr 1fr;
+            height: calc(100vh - 56px - 40px); /* Controls bar + Footer */
+            gap: 1px;
+            background: var(--border-primary);
+        }
+
+        .panel {
+            background: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .panel-header {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border-primary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            background: var(--bg-tertiary);
+        }
+
+        .panel-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .panel-title-icon {
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+        }
+
+        .panel-badge {
+            font-size: 10px;
+            padding: 3px 8px;
+            background: var(--bg-elevated);
+            border-radius: 4px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow: hidden;
+            padding: 0;
+            min-width: 0; /* Allow content to shrink if needed */
+            display: flex;
+            flex-direction: column;
+        }
+
+        #code-content {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* ===== CODE PANEL ===== */
+        #code-panel {
+            grid-column: 1;
+            grid-row: 1 / 3;
+        }
+
+        .code-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .code-tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: var(--transition-fast);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .code-tab:hover {
+            color: var(--text-secondary);
+            background: var(--bg-hover);
+        }
+
+        .code-tab.active {
+            color: var(--accent-primary);
+            border-bottom-color: var(--accent-primary);
+            background: transparent;
+        }
+
+        /* Assembly Editor Wrapper */
+        .assembly-editor-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            overflow: hidden;
+            flex: 1;
+        }
+
+        .line-numbers {
+            background: var(--bg-tertiary);
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.8;
+            padding: 20px 8px 20px 20px;
+            text-align: right;
+            user-select: none;
+            border-right: 1px solid var(--border-primary);
+            min-width: 50px;
+            flex-shrink: 0;
+            overflow-y: hidden;
+            overflow-x: hidden;
+        }
+
+        .line-number {
+            display: block;
+            min-height: 23.4px; /* Match line-height * font-size */
+            position: relative;
+            padding-right: 8px;
+        }
+
+        .line-number.error::before {
+            content: '●';
+            color: var(--accent-danger);
+            position: absolute;
+            left: -8px;
+            font-size: 12px;
+            font-weight: bold;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .editor-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #assembly-editor {
+            width: 100%;
+            height: 100%;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border: none;
+            padding: 20px;
+            padding-left: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.8;
+            resize: none;
+            outline: none;
+            letter-spacing: 0.3px;
+            tab-size: 4;
+        }
+
+        #assembly-editor::placeholder {
+            color: var(--text-muted);
+        }
+
+        #assembly-editor::selection {
+            background: rgba(88, 166, 255, 0.3);
+        }
+
+        /* ===== TIMELINE PANEL ===== */
+        #timeline-panel {
+            grid-column: 2;
+            grid-row: 1;
+        }
+
+        .timeline-wrapper {
+            overflow-x: auto;
+            overflow-y: auto;
+            height: 100%;
+            padding: 8px;
+            padding-top: 0;
+            cursor: default;
+            position: relative;
+        }
+
+        .timeline-wrapper::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+
+        .timeline-wrapper::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        .timeline-wrapper::-webkit-scrollbar-thumb {
+            background: var(--border-secondary);
+            border-radius: 4px;
+        }
+
+        .timeline-wrapper::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        #timeline-table {
+            border-collapse: separate;
+            border-spacing: 3px;
+            font-size: 11px;
+            width: max-content;
+            min-width: 100%;
+            table-layout: fixed;
+        }
+
+        #timeline-table th {
+            background: var(--bg-tertiary);
+            color: var(--text-muted);
+            padding: 6px 2px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 10px;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            width: 44px;
+            min-width: 44px;
+            max-width: 44px;
+            height: 32px;
+            min-height: 32px;
+            max-height: 32px;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        /* INSTR header - sticky both horizontally and vertically (corner cell) */
+        #timeline-table th:first-child {
+            background: var(--bg-elevated);
+            text-align: left;
+            width: 140px;
+            min-width: 140px;
+            max-width: 140px;
+            position: sticky;
+            left: 0;
+            top: 0;
+            z-index: 30; /* Higher z-index for corner cell */
+            padding-left: 10px;
+            border-radius: 4px 0 0 4px;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.4);
+        }
+
+        #timeline-table th.current {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+        }
+
+        #timeline-table td {
+            padding: 0;
+            text-align: center;
+            width: 44px;
+            min-width: 44px;
+            max-width: 44px;
+            height: 32px;
+            min-height: 32px;
+            max-height: 32px;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            vertical-align: middle;
+            box-sizing: border-box;
+        }
+
+        #timeline-table tr:hover td {
+            background: var(--bg-tertiary);
+        }
+
+        /* INSTR column cells - sticky horizontally */
+        #timeline-table td:first-child {
+            text-align: left;
+            background: var(--bg-tertiary);
+            font-size: 10px;
+            width: 140px;
+            min-width: 140px;
+            max-width: 140px;
+            position: sticky;
+            left: 0;
+            z-index: 10; /* Higher than regular cells */
+            padding: 6px 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            border-radius: 4px 0 0 4px;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.4);
+            box-sizing: border-box;
+        }
+
+        #timeline-table tr:hover td:first-child {
+            background: var(--bg-elevated);
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.5);
+        }
+
+        .stage-cell {
+            display: inline-block;
+            padding: 4px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 9px;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            transition: var(--transition-fast);
+            cursor: pointer;
+            height: 22px;
+            line-height: 14px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        .stage-cell:hover {
+            box-shadow: var(--shadow-md);
+        }
+
+        .stage-if {
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--stage-if);
+            border: 1px solid rgba(59, 130, 246, 0.4);
+        }
+
+        .stage-id {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--stage-id);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+        }
+
+        .stage-ex {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--stage-ex);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+        }
+
+        .stage-mem {
+            background: rgba(168, 85, 247, 0.2);
+            color: var(--stage-mem);
+            border: 1px solid rgba(168, 85, 247, 0.4);
+        }
+
+        .stage-wb {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--stage-wb);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+
+        .instr-label {
+            color: var(--text-muted);
+            margin-right: 8px;
+            font-weight: 600;
+            font-size: 9px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .instr-hex {
+            color: var(--accent-cyan);
+            margin-right: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+        }
+
+        .instr-asm {
+            color: var(--text-secondary);
+            font-size: 9px;
+        }
+
+        /* ===== PIPELINE DIAGRAM ===== */
+        #diagram-panel {
+            grid-column: 2;
+            grid-row: 2;
+        }
+
+        .pipeline-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 24px 16px;
+            gap: 8px;
+        }
+
+        .stage-box {
+            flex: 1;
+            text-align: center;
+            padding: 20px 12px;
+            border: 1px solid var(--border-secondary);
+            border-radius: 8px;
+            background: var(--bg-tertiary);
+            position: relative;
+            transition: var(--transition-normal);
+        }
+
+        .stage-box.active {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 16px rgba(88, 166, 255, 0.15);
+        }
+
+        .stage-box.active .stage-name {
+            color: var(--accent-primary);
+        }
+
+        .stage-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            transition: var(--transition-normal);
+        }
+
+        .stage-instr {
+            font-size: 10px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .stage-arrow {
+            color: var(--text-muted);
+            font-size: 16px;
+        }
+
+        /* Hazard Panel */
+        .hazard-panel {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-primary);
+        }
+
+        .hazard-item {
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid var(--border-primary);
+            transition: var(--transition-fast);
+        }
+
+        .hazard-item.full-width {
+            grid-column: 1 / -1;
+            text-align: left;
+        }
+
+        .hazard-item.active {
+            border-color: var(--accent-warning);
+            background: rgba(210, 153, 34, 0.1);
+        }
+
+        .hazard-label {
+            font-size: 9px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .hazard-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .hazard-value.active {
+            color: var(--accent-warning);
+        }
+
+        /* ===== INFO PANEL ===== */
+        #info-panel {
+            grid-column: 3;
+            grid-row: 1;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .info-item {
+            padding: 14px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            border: 1px solid var(--border-primary);
+            transition: var(--transition-fast);
+        }
+
+        .info-item:hover {
+            border-color: var(--border-secondary);
+        }
+
+        .info-item.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .info-label {
+            font-size: 9px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .info-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .info-value.highlight {
+            color: var(--accent-primary);
+        }
+
+        /* ===== REGISTERS PANEL ===== */
+        #regs-panel {
+            grid-column: 3;
+            grid-row: 2;
+        }
+
+        .reg-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .reg-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            border: 1px solid var(--border-primary);
+            font-size: 12px;
+            transition: var(--transition-fast);
+        }
+
+        .reg-item:hover {
+            border-color: var(--border-secondary);
+        }
+
+        .reg-name {
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
+        }
+
+        .reg-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .reg-item.modified {
+            border-color: var(--accent-success);
+            background: rgba(63, 185, 80, 0.05);
+        }
+
+        .reg-item.modified .reg-value {
+            color: var(--accent-success);
+        }
+
+        /* Memory Section */
+        .memory-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-primary);
+        }
+
+        .memory-title {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .mem-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-size: 11px;
+            border: 1px solid var(--border-primary);
+        }
+
+        .mem-addr {
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .mem-value {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-cyan);
+            font-weight: 500;
+        }
+
+        /* ===== TOOLTIP ===== */
+        .tooltip {
+            position: fixed;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-secondary);
+            border-radius: 10px;
+            font-size: 11px;
+            z-index: 1000;
+            pointer-events: none;
+            min-width: 200px;
+            max-width: 300px;
+            display: none;
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            animation: tooltipFadeIn 0.15s ease;
+        }
+
+        @keyframes tooltipFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(4px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .tooltip-title {
+            font-weight: 600;
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border-primary);
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+            font-size: 12px;
+        }
+
+        .tooltip-content {
+            padding: 12px 14px;
+        }
+
+        .tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 6px 0;
+            gap: 20px;
+        }
+
+        .tooltip-label {
+            color: var(--text-muted);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tooltip-value {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-cyan);
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        /* ===== MACHINE CODE DISPLAY ===== */
+        #machine-code-list {
+            padding: 0;
+            height: 100%;
+            overflow-y: auto;
+            display: none;
+            flex: 1;
+        }
+
+        .machine-code-item {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-primary);
+            transition: var(--transition-fast);
+        }
+
+        .machine-code-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .machine-code-item.current {
+            background: rgba(88, 166, 255, 0.1);
+            border-left: 3px solid var(--accent-primary);
+            padding-left: 13px;
+        }
+
+        .mc-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .mc-pc {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-muted);
+            min-width: 24px;
+        }
+
+        .mc-hex {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+        }
+
+        .mc-binary {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .mc-asm {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text-primary);
+            padding-left: 36px;
+            margin-bottom: 6px;
+        }
+
+        .mc-format {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            color: var(--text-muted);
+            padding-left: 36px;
+        }
+
+        .mc-format span {
+            margin-right: 4px;
+        }
+
+        .mc-format .field-value {
+            color: var(--text-secondary);
+        }
+
+        .mc-format .field-name {
+            color: var(--text-muted);
+            font-size: 8px;
+        }
+
+        /* ===== STATUS TOAST ===== */
+        #status {
+            position: fixed;
+            bottom: 24px;
+            right: 520px; /* Move left when error panel is visible */
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            padding: 14px 20px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            display: none;
+            z-index: 2000;
+            border: 1px solid var(--border-secondary);
+            box-shadow: var(--shadow-lg);
+            animation: slideIn 0.3s ease;
+            transition: right 0.3s ease;
+        }
+
+        /* Adjust status position when error panel is visible */
+        .error-panel.visible ~ #status,
+        body:has(.error-panel.visible) #status {
+            right: 520px;
+        }
+
+        /* ===== ERROR PANEL ===== */
+        .error-panel {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 480px;
+            max-height: 400px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--accent-danger);
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            z-index: 1999;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            animation: slideIn 0.3s ease;
+        }
+
+        .error-panel.visible {
+            display: flex;
+        }
+
+        .error-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: rgba(248, 81, 73, 0.15);
+            border-bottom: 1px solid var(--accent-danger);
+        }
+
+        .error-panel-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent-danger);
+        }
+
+        .error-panel-close {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: var(--transition-fast);
+        }
+
+        .error-panel-close:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .error-panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .error-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .error-item {
+            padding: 10px 12px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            border-left: 3px solid var(--accent-danger);
+            font-size: 11px;
+            transition: var(--transition-fast);
+            cursor: pointer;
+        }
+
+        .error-item:hover {
+            background: var(--bg-hover);
+            border-left-color: var(--accent-danger);
+        }
+
+        .error-item-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .error-line-number {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: var(--accent-danger);
+            min-width: 40px;
+        }
+
+        .error-message {
+            color: var(--text-primary);
+            font-weight: 500;
+            flex: 1;
+        }
+
+        .error-source {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            padding-left: 48px;
+            word-break: break-all;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        #status.error {
+            border-color: var(--accent-danger);
+            background: rgba(248, 81, 73, 0.15);
+        }
+
+        #status.success {
+            border-color: var(--accent-success);
+            background: rgba(63, 185, 80, 0.15);
+        }
+
+        /* ===== FOOTER ===== */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 10px 24px;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 10px;
+            color: var(--text-muted);
+            z-index: 50;
+        }
+
+        .legend {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+        }
+
+        /* ===== ANIMATIONS ===== */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .panel-content {
+            animation: fadeIn 0.3s ease;
+        }
+
+        /* Empty State */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .empty-state-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        .empty-state-text {
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Controls -->
+    <div class="controls-bar">
+        <div class="btn-group">
+            <button id="btn-compile" title="Compile assembly to machine code">
+                <span>⌘</span> COMPILE
+            </button>
+            <button id="btn-assemble" class="primary" title="Load into CPU">
+                <span>↓</span> LOAD
+            </button>
+        </div>
+        <div class="btn-group">
+            <button id="btn-step" title="Single Step">
+                <span>→</span> STEP
+            </button>
+            <button id="btn-run" class="success" title="Run Continuously">
+                <span>▶</span> RUN
+            </button>
+            <button id="btn-pause" title="Pause Execution">
+                <span>⏸</span> PAUSE
+            </button>
+        </div>
+        <div class="btn-group">
+            <button id="btn-reset" class="danger" title="Reset CPU">
+                <span>↻</span> RESET
+            </button>
+        </div>
+        <div class="stat-group">
+            <div class="stat-item">
+                <span class="stat-label">Cycle</span>
+                <span class="stat-value" id="header-cycle">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">PC</span>
+                <span class="stat-value accent" id="header-pc">0x0000</span>
+            </div>
+        </div>
+        <div class="speed-control">
+            <label>SPEED</label>
+            <input type="range" id="hz-slider" min="1" max="100" value="10">
+            <span class="speed-value"><span id="hz-value">10</span> Hz</span>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Code Panel -->
+        <div class="panel" id="code-panel">
+            <div class="code-tabs">
+                <div class="code-tab active" data-tab="assembly">ASSEMBLY</div>
+                <div class="code-tab" data-tab="machine">MACHINE CODE</div>
+            </div>
+            <div class="panel-content" id="code-content" style="padding: 0;">
+                <div class="assembly-editor-wrapper">
+                    <div class="line-numbers" id="line-numbers"></div>
+                    <div class="editor-container">
+                        <textarea id="assembly-editor" spellcheck="false" placeholder="# Write your assembly code here...
+# 
+# Available instructions:
+#   R-Type: add, sub, and, or, xor, slt, div
+#   I-Type: addi, lw, sw, beq, j, jal, jr
+#
+# Example:
+#   addi r1, r0, 5    # r1 = 5
+#   addi r2, r0, 3    # r2 = 3
+#   add r3, r1, r2    # r3 = r1 + r2"># Example Program: Sum of Numbers
+addi r1, r0, 5      # r1 = 5
+addi r2, r0, 3      # r2 = 3
+add r3, r1, r2      # r3 = r1 + r2 = 8
+sw r3, 0(r0)        # mem[0] = r3
+lw r4, 0(r0)        # r4 = mem[0]
+sub r5, r3, r2      # r5 = r3 - r2 = 5</textarea>
+                    </div>
+                </div>
+                <div id="machine-code-list" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Timeline Panel -->
+        <div class="panel" id="timeline-panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <span class="panel-title-icon">📊</span>
+                    Pipeline Timeline
+                </div>
+                <div class="panel-badge">16 Clock Window</div>
+            </div>
+            <div class="panel-content" style="padding: 0;">
+                <div class="timeline-wrapper" id="timeline-wrapper">
+                    <table id="timeline-table">
+                        <thead id="timeline-header">
+                            <tr>
+                                <th>INSTR</th>
+                                <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th>
+                            </tr>
+                        </thead>
+                        <tbody id="timeline-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pipeline Diagram -->
+        <div class="panel" id="diagram-panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <span class="panel-title-icon">🔄</span>
+                    Pipeline Stages
+                </div>
+            </div>
+            <div class="panel-content">
+                <div class="pipeline-diagram">
+                    <div class="stage-box" id="stage-if">
+                        <div class="stage-name" style="color: var(--stage-if);">IF</div>
+                        <div class="stage-instr" id="if-instr">—</div>
+                    </div>
+                    <div class="stage-arrow">→</div>
+                    <div class="stage-box" id="stage-id">
+                        <div class="stage-name" style="color: var(--stage-id);">ID</div>
+                        <div class="stage-instr" id="id-instr">—</div>
+                    </div>
+                    <div class="stage-arrow">→</div>
+                    <div class="stage-box" id="stage-ex">
+                        <div class="stage-name" style="color: var(--stage-ex);">EX</div>
+                        <div class="stage-instr" id="ex-instr">—</div>
+                    </div>
+                    <div class="stage-arrow">→</div>
+                    <div class="stage-box" id="stage-mem">
+                        <div class="stage-name" style="color: var(--stage-mem);">MEM</div>
+                        <div class="stage-instr" id="mem-instr">—</div>
+                    </div>
+                    <div class="stage-arrow">→</div>
+                    <div class="stage-box" id="stage-wb">
+                        <div class="stage-name" style="color: var(--stage-wb);">WB</div>
+                        <div class="stage-instr" id="wb-instr">—</div>
+                    </div>
+                </div>
+                <div class="hazard-panel">
+                    <div class="hazard-item full-width" id="hz-instr-item" style="display: none;">
+                        <div class="hazard-label">Selected Instruction</div>
+                        <div class="hazard-value" id="hz-instr" style="font-size: 11px; word-break: break-all;">—</div>
+                    </div>
+                    <div class="hazard-item" id="hz-stall-item">
+                        <div class="hazard-label">Stall</div>
+                        <div class="hazard-value" id="hz-stall">NO</div>
+                    </div>
+                    <div class="hazard-item" id="hz-fwd-a-item">
+                        <div class="hazard-label">Forward A</div>
+                        <div class="hazard-value" id="hz-fwd-a">00</div>
+                    </div>
+                    <div class="hazard-item" id="hz-fwd-b-item">
+                        <div class="hazard-label">Forward B</div>
+                        <div class="hazard-value" id="hz-fwd-b">00</div>
+                    </div>
+                    <div class="hazard-item" id="hz-pcsrc-item">
+                        <div class="hazard-label">PC Source</div>
+                        <div class="hazard-value" id="hz-pcsrc">0</div>
+                    </div>
+                    <div class="hazard-item" id="hz-zero-item">
+                        <div class="hazard-label">ALU Zero</div>
+                        <div class="hazard-value" id="hz-zero">0</div>
+                    </div>
+                    <div class="hazard-item" id="hz-flush-item">
+                        <div class="hazard-label">Flush</div>
+                        <div class="hazard-value" id="hz-flush">NO</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Signals Panel -->
+        <div class="panel" id="info-panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <span class="panel-title-icon">⚙️</span>
+                    Control Signals
+                </div>
+                <div class="panel-badge">ID/EX Stage</div>
+            </div>
+            <div class="panel-content">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">RegDst</div>
+                        <div class="info-value" id="ctrl-regdst">0</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">ALUSrc</div>
+                        <div class="info-value" id="ctrl-alusrc">0</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">MemToReg</div>
+                        <div class="info-value" id="ctrl-memtoreg">0</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">RegWrite</div>
+                        <div class="info-value" id="ctrl-regwrite">0</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">MemRead</div>
+                        <div class="info-value" id="ctrl-memread">0</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">MemWrite</div>
+                        <div class="info-value" id="ctrl-memwrite">0</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Branch</div>
+                        <div class="info-value" id="ctrl-branch">0</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Jump</div>
+                        <div class="info-value" id="ctrl-jump">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Registers Panel -->
+        <div class="panel" id="regs-panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <span class="panel-title-icon">📁</span>
+                    Register File
+                </div>
+                <div class="panel-badge">8 × 16-bit</div>
+            </div>
+            <div class="panel-content">
+                <div class="reg-grid" id="reg-grid"></div>
+                <div class="memory-section">
+                    <div class="memory-title">Data Memory</div>
+                    <div id="mem-list"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="legend">
+            <span style="color: var(--text-muted);">STAGES:</span>
+            <div class="legend-item">
+                <div class="legend-color" style="background: var(--stage-if);"></div>
+                <span>IF</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: var(--stage-id);"></div>
+                <span>ID</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: var(--stage-ex);"></div>
+                <span>EX</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: var(--stage-mem);"></div>
+                <span>MEM</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: var(--stage-wb);"></div>
+                <span>WB</span>
+            </div>
+        </div>
+        <div>16-bit Pipelined CPU Simulator • 5 Stages • 8 Registers • WebSocket Real-time</div>
+    </footer>
+
+    <!-- Tooltip -->
+    <div class="tooltip" id="tooltip"></div>
+
+    <!-- Status Toast -->
+    <div id="status"></div>
+
+    <!-- Error Panel -->
+    <div class="error-panel" id="error-panel">
+        <div class="error-panel-header">
+            <div class="error-panel-title">
+                <span>⚠️</span>
+                <span id="error-count">0</span> Hata
+            </div>
+            <button class="error-panel-close" id="error-panel-close">×</button>
+        </div>
+        <div class="error-panel-content" id="error-panel-content">
+            <div class="error-list" id="error-list"></div>
+        </div>
+    </div>
+
+    <script>
+        class CPUSimulator {
+            constructor() {
+                this.ws = null;
+                this.state = null;
+                this.activeTab = 'assembly';
+                this.compiledMachineCode = null;
+                this.selectedInstrPC = null; // Selected instruction PC for hazard panel
+                this.selectedInstrData = null; // Full instruction data for selected instruction
+                this.init();
+            }
+
+            init() {
+                this.connectWebSocket();
+                this.setupEventListeners();
+                this.setupTabs();
+                this.setupTimelineScroll();
+                this.initRegisters();
+                this.setupErrorPanel();
+                this.setupLineNumbers();
+            }
+
+            setupErrorPanel() {
+                const closeBtn = document.getElementById('error-panel-close');
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', () => {
+                        this.hideErrors();
+                    });
+                }
+            }
+
+            setupLineNumbers() {
+                const editor = document.getElementById('assembly-editor');
+                const lineNumbers = document.getElementById('line-numbers');
+                
+                if (!editor || !lineNumbers) return;
+                
+                // Update line numbers on input
+                editor.addEventListener('input', () => {
+                    this.updateLineNumbers();
+                });
+                
+                // Sync scroll - both directions
+                editor.addEventListener('scroll', () => {
+                    lineNumbers.scrollTop = editor.scrollTop;
+                });
+                
+                lineNumbers.addEventListener('scroll', () => {
+                    editor.scrollTop = lineNumbers.scrollTop;
+                });
+                
+                // Update on paste
+                editor.addEventListener('paste', () => {
+                    setTimeout(() => this.updateLineNumbers(), 10);
+                });
+                
+                // Initial update
+                this.updateLineNumbers();
+            }
+
+            updateLineNumbers() {
+                const editor = document.getElementById('assembly-editor');
+                const lineNumbers = document.getElementById('line-numbers');
+                
+                if (!editor || !lineNumbers) return;
+                
+                const lines = editor.value.split('\n');
+                const errorLines = this.errorLines || new Set();
+                
+                // Update line numbers HTML
+                lineNumbers.innerHTML = '';
+                for (let i = 0; i < lines.length; i++) {
+                    const lineNum = i + 1;
+                    const lineDiv = document.createElement('div');
+                    lineDiv.className = 'line-number';
+                    if (errorLines.has(lineNum)) {
+                        lineDiv.classList.add('error');
+                    }
+                    lineDiv.textContent = lineNum;
+                    lineNumbers.appendChild(lineDiv);
+                }
+                
+                // Sync scroll position
+                lineNumbers.scrollTop = editor.scrollTop;
+            }
+
+            markErrorLines(errors) {
+                const errorLines = new Set();
+                if (errors && errors.length > 0) {
+                    errors.forEach(error => {
+                        if (error.line) {
+                            errorLines.add(error.line);
+                        }
+                    });
+                }
+                this.errorLines = errorLines;
+                this.updateLineNumbers();
+            }
+
+            clearErrorLines() {
+                this.errorLines = new Set();
+                this.updateLineNumbers();
+            }
+
+            initRegisters() {
+                const grid = document.getElementById('reg-grid');
+                grid.innerHTML = '';
+                for (let i = 0; i < 8; i++) {
+                    const item = document.createElement('div');
+                    item.className = 'reg-item';
+                    item.innerHTML = `
+                        <span class="reg-name">r${i}</span>
+                        <span class="reg-value">0</span>
+                    `;
+                    grid.appendChild(item);
+                }
+            }
+
+            setupTimelineScroll() {
+                // Timeline now uses standard scroll bars - no drag functionality needed
+                // Scroll bars are handled by CSS overflow: auto
+            }
+
+            connectWebSocket() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws/cpu/`;
+
+                this.ws = new WebSocket(wsUrl);
+
+                this.ws.onopen = () => {
+                    this.showStatus('Connected to CPU', 'success');
+                };
+
+                this.ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    this.handleMessage(data);
+                };
+
+                this.ws.onclose = () => {
+                    setTimeout(() => this.connectWebSocket(), 2000);
+                };
+
+                this.ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                };
+            }
+
+            setupEventListeners() {
+                document.getElementById('btn-compile').addEventListener('click', () => {
+                    const code = document.getElementById('assembly-editor').value;
+                    if (!code.trim()) {
+                        this.showStatus('No code to compile', 'error');
+                        return;
+                    }
+                    this.compileToMachineCode(code);
+                    this.showStatus('Compiling...', 'success');
+                });
+
+                document.getElementById('btn-assemble').addEventListener('click', () => {
+                    const code = document.getElementById('assembly-editor').value;
+                    if (!code.trim()) {
+                        this.showStatus('No code to load', 'error');
+                        return;
+                    }
+                    
+                    // Clear timeline first
+                    const tbody = document.getElementById('timeline-body');
+                    if (tbody) tbody.innerHTML = '';
+                    
+                    // Load program into CPU (this will trigger timeline update via state update)
+                    this.send({ cmd: 'load_program', assembly: code });
+                    this.showStatus('Loading program into CPU...', 'success');
+                    
+                    // Switch to machine code tab after loading
+                    setTimeout(() => {
+                        if (this.state && this.state.instr_mem) {
+                            document.querySelector('.code-tab[data-tab="machine"]').click();
+                        }
+                    }, 100);
+                });
+
+                // No auto-formatting or auto-compilation on input
+                // User must manually click COMPILE or LOAD buttons
+
+                document.getElementById('btn-step').addEventListener('click', () => {
+                    // If instruction is selected, continue from that instruction
+                    if (this.selectedInstrPC !== null) {
+                        // Send step command with selected PC to continue from that instruction
+                        this.send({ cmd: 'step', from_pc: this.selectedInstrPC });
+                        this.showStatus(`Stepping from instruction PC ${this.selectedInstrPC}`, 'success');
+                    } else {
+                        this.send({ cmd: 'step' });
+                    }
+                });
+                document.getElementById('btn-run').addEventListener('click', () => {
+                    const hz = parseInt(document.getElementById('hz-slider').value);
+                    this.send({ cmd: 'run', hz: hz });
+                });
+                document.getElementById('btn-pause').addEventListener('click', () => this.send({ cmd: 'pause' }));
+                document.getElementById('btn-reset').addEventListener('click', () => {
+                    this.send({ cmd: 'reset' });
+                    document.getElementById('machine-code-list').innerHTML = '';
+                });
+
+                document.getElementById('hz-slider').addEventListener('input', (e) => {
+                    document.getElementById('hz-value').textContent = e.target.value;
+                });
+            }
+
+            compileToMachineCode(assemblyCode) {
+                this.send({ cmd: 'compile', assembly: assemblyCode });
+            }
+
+            setupTabs() {
+                document.querySelectorAll('.code-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        document.querySelectorAll('.code-tab').forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        this.activeTab = tab.dataset.tab;
+
+                        const editorWrapper = document.querySelector('.assembly-editor-wrapper');
+                        const machineCodeList = document.getElementById('machine-code-list');
+
+                        if (this.activeTab === 'assembly') {
+                            if (editorWrapper) editorWrapper.style.display = 'flex';
+                            if (machineCodeList) machineCodeList.style.display = 'none';
+                        } else {
+                            if (editorWrapper) editorWrapper.style.display = 'none';
+                            if (machineCodeList) machineCodeList.style.display = 'block';
+                            const code = document.getElementById('assembly-editor').value;
+                            if (code.trim() && !this.compiledMachineCode) {
+                                this.send({ cmd: 'compile', assembly: code });
+                            } else {
+                                this.updateMachineCode();
+                            }
+                        }
+                    });
+                });
+            }
+
+            send(data) {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify(data));
+                }
+            }
+
+            handleMessage(data) {
+                if (data.type === 'state') {
+                    this.state = data;
+                    this.updateUI();
+                    if (this.activeTab === 'machine') {
+                        this.updateMachineCode();
+                    }
+                } else if (data.type === 'compile_result') {
+                    this.compiledMachineCode = data.machine_code;
+                    
+                    // Automatically switch to machine code tab after compilation
+                    if (!this.activeTab || this.activeTab === 'assembly') {
+                        document.querySelector('.code-tab[data-tab="machine"]')?.click();
+                    }
+                    
+                    if (this.activeTab === 'machine') {
+                        this.updateMachineCode();
+                    }
+                    // COMPILE only compiles, doesn't update timeline
+                    // Timeline will be updated when LOAD is clicked
+                    if (data.has_errors && data.errors && data.errors.length > 0) {
+                        this.showErrors(data.errors);
+                        this.markErrorLines(data.errors);
+                        this.showStatus('Compilation failed', 'error');
+                    } else {
+                        this.hideErrors();
+                        this.clearErrorLines();
+                        this.showStatus('Compilation successful', 'success');
+                    }
+                } else if (data.type === 'error') {
+                    if (data.errors && data.errors.length > 0) {
+                        this.showErrors(data.errors);
+                        this.markErrorLines(data.errors);
+                    } else {
+                        this.showStatus(data.message || 'Error', 'error');
+                        this.clearErrorLines();
+                    }
+                }
+            }
+
+            compileAssembly() {
+                const code = document.getElementById('assembly-editor').value;
+                if (code.trim()) {
+                    this.send({ cmd: 'compile', assembly: code });
+                } else {
+                    this.compiledMachineCode = null;
+                    if (this.activeTab === 'machine') {
+                        this.updateMachineCode();
+                    }
+                }
+            }
+
+            updateUI() {
+                this.updateHeader();
+                this.updatePipelineDiagram();
+                this.updateHazards();
+                this.updateControlSignals();
+                this.updateRegisters();
+                this.updateMemory();
+                this.updateMachineCode();
+                this.updateTimeline();
+                // Update selected instruction info on every state update
+                if (this.selectedInstrPC !== null) {
+                    this.updateSelectedInstructionInfo();
+                }
+            }
+
+            updateHeader() {
+                document.getElementById('header-cycle').textContent = this.state.cycle;
+                document.getElementById('header-pc').textContent = '0x' + this.state.pc.toString(16).toUpperCase().padStart(4, '0');
+            }
+
+            updatePipelineDiagram() {
+                const stages = ['if', 'id', 'ex', 'mem', 'wb'];
+                const stageInfo = this.state.stage_info;
+                const pipelineRegs = this.state.pipeline_regs;
+
+                // IF Stage
+                document.getElementById('if-instr').textContent = stageInfo.if?.asm || 'nop';
+
+                // ID Stage
+                document.getElementById('id-instr').textContent = stageInfo.id?.asm || 'nop';
+
+                // EX Stage
+                const exCtrl = pipelineRegs.id_ex.ctrl;
+                document.getElementById('ex-instr').textContent = exCtrl && exCtrl !== '00000000' ? (stageInfo.ex?.asm || 'nop') : '—';
+
+                // MEM Stage
+                const memCtrl = pipelineRegs.ex_mem.ctrl;
+                document.getElementById('mem-instr').textContent = memCtrl && memCtrl !== '00000000' ? (stageInfo.mem?.asm || 'nop') : '—';
+
+                // WB Stage
+                const wbCtrl = pipelineRegs.mem_wb.ctrl;
+                document.getElementById('wb-instr').textContent = wbCtrl && wbCtrl !== '00000000' ? (stageInfo.wb?.asm || 'nop') : '—';
+
+                // Highlight active stages
+                stages.forEach((stage, index) => {
+                    const box = document.getElementById('stage-' + stage);
+                    if (this.state.cycle > index) {
+                        box.classList.add('active');
+                    } else {
+                        box.classList.remove('active');
+                    }
+                });
+            }
+
+            updateHazards() {
+                const hazards = this.state.hazards;
+                const currentCycle = this.state.cycle;
+
+                // If instruction is selected, determine which stage it's in
+                let selectedStage = null;
+                if (this.selectedInstrPC !== null) {
+                    const instrStartCycle = this.selectedInstrPC + 1;
+                    if (currentCycle >= instrStartCycle + 4) {
+                        selectedStage = 'WB';
+                    } else if (currentCycle >= instrStartCycle + 3) {
+                        selectedStage = 'MEM';
+                    } else if (currentCycle >= instrStartCycle + 2) {
+                        selectedStage = 'EX';
+                    } else if (currentCycle >= instrStartCycle + 1) {
+                        selectedStage = 'ID';
+                    } else if (currentCycle >= instrStartCycle) {
+                        selectedStage = 'IF';
+                    }
+                }
+
+                // Update hazards based on selected instruction's stage
+                // If no instruction selected, show current CPU state
+                if (this.selectedInstrPC !== null && selectedStage) {
+                    // Show hazards relevant to selected instruction's stage
+                    this.updateHazardsForStage(selectedStage, hazards);
+                } else {
+                    // Show current CPU state hazards
+                    this.updateHazardsForStage(null, hazards);
+                }
+                
+                // Update selected instruction info if one is selected
+                if (this.selectedInstrPC !== null) {
+                    this.updateSelectedInstructionInfo();
+                }
+            }
+
+            updateHazardsForStage(stage, hazards) {
+                const currentCycle = this.state.cycle;
+                const stageInfo = this.state.stage_info;
+
+                // Stall - relevant for ID stage
+                const stallEl = document.getElementById('hz-stall');
+                if (stage === 'ID' || stage === null) {
+                    stallEl.textContent = hazards.stall ? 'YES' : 'NO';
+                    stallEl.className = 'hazard-value' + (hazards.stall ? ' active' : '');
+                    document.getElementById('hz-stall-item').className = 'hazard-item' + (hazards.stall ? ' active' : '');
+                } else {
+                    stallEl.textContent = '—';
+                    stallEl.className = 'hazard-value';
+                    document.getElementById('hz-stall-item').className = 'hazard-item';
+                }
+
+                // Forward A - relevant for EX stage
+                const fwdA = hazards.forward_a;
+                if (stage === 'EX' || stage === null) {
+                    document.getElementById('hz-fwd-a').textContent = fwdA;
+                    document.getElementById('hz-fwd-a').className = 'hazard-value' + (fwdA !== '00' ? ' active' : '');
+                    document.getElementById('hz-fwd-a-item').className = 'hazard-item' + (fwdA !== '00' ? ' active' : '');
+                } else {
+                    document.getElementById('hz-fwd-a').textContent = '—';
+                    document.getElementById('hz-fwd-a').className = 'hazard-value';
+                    document.getElementById('hz-fwd-a-item').className = 'hazard-item';
+                }
+
+                // Forward B - relevant for EX stage
+                const fwdB = hazards.forward_b;
+                if (stage === 'EX' || stage === null) {
+                    document.getElementById('hz-fwd-b').textContent = fwdB;
+                    document.getElementById('hz-fwd-b').className = 'hazard-value' + (fwdB !== '00' ? ' active' : '');
+                    document.getElementById('hz-fwd-b-item').className = 'hazard-item' + (fwdB !== '00' ? ' active' : '');
+                } else {
+                    document.getElementById('hz-fwd-b').textContent = '—';
+                    document.getElementById('hz-fwd-b').className = 'hazard-value';
+                    document.getElementById('hz-fwd-b-item').className = 'hazard-item';
+                }
+
+                // PC Source - relevant for IF/ID stage (branch/jump)
+                if (stage === 'IF' || stage === 'ID' || stage === null) {
+                    document.getElementById('hz-pcsrc').textContent = hazards.pc_src ? '1' : '0';
+                    document.getElementById('hz-pcsrc').className = 'hazard-value' + (hazards.pc_src ? ' active' : '');
+                    document.getElementById('hz-pcsrc-item').className = 'hazard-item' + (hazards.pc_src ? ' active' : '');
+                } else {
+                    document.getElementById('hz-pcsrc').textContent = '—';
+                    document.getElementById('hz-pcsrc').className = 'hazard-value';
+                    document.getElementById('hz-pcsrc-item').className = 'hazard-item';
+                }
+
+                // ALU Zero - relevant for EX stage
+                const zero = stageInfo.ex?.zero;
+                if (stage === 'EX' || stage === null) {
+                    document.getElementById('hz-zero').textContent = zero ? '1' : '0';
+                    document.getElementById('hz-zero').className = 'hazard-value' + (zero ? ' active' : '');
+                    document.getElementById('hz-zero-item').className = 'hazard-item' + (zero ? ' active' : '');
+                } else {
+                    document.getElementById('hz-zero').textContent = '—';
+                    document.getElementById('hz-zero').className = 'hazard-value';
+                    document.getElementById('hz-zero-item').className = 'hazard-item';
+                }
+
+                // Flush - relevant for IF/ID stage
+                const flush = hazards.flush_ifid || hazards.flush_idex;
+                if (stage === 'IF' || stage === 'ID' || stage === null) {
+                    document.getElementById('hz-flush').textContent = flush ? 'YES' : 'NO';
+                    document.getElementById('hz-flush').className = 'hazard-value' + (flush ? ' active' : '');
+                    document.getElementById('hz-flush-item').className = 'hazard-item' + (flush ? ' active' : '');
+                } else {
+                    document.getElementById('hz-flush').textContent = '—';
+                    document.getElementById('hz-flush').className = 'hazard-value';
+                    document.getElementById('hz-flush-item').className = 'hazard-item';
+                }
+            }
+
+            selectInstruction(pc, instrData) {
+                this.selectedInstrPC = pc;
+                this.selectedInstrData = instrData; // Store full instruction data
+                
+                // Update visual selection
+                document.querySelectorAll('.instr-row-header').forEach(header => {
+                    header.style.background = '';
+                    header.style.borderLeft = '';
+                    if (parseInt(header.dataset.pc) === pc) {
+                        header.style.background = 'var(--bg-elevated)';
+                        header.style.borderLeft = '3px solid var(--accent-primary)';
+                    }
+                });
+                
+                // Update hazard panel with instruction info
+                this.updateSelectedInstructionInfo();
+            }
+
+            updateSelectedInstructionInfo() {
+                if (this.selectedInstrPC === null) {
+                    document.getElementById('hz-instr-item').style.display = 'none';
+                    return;
+                }
+                
+                // Get instruction data - prefer current state, then stored data, then compiled code
+                let instr = null;
+                let fullAsm = null;
+                
+                // First try current state (most up-to-date)
+                if (this.state && this.state.instr_mem && this.state.instr_mem[this.selectedInstrPC]) {
+                    instr = this.state.instr_mem[this.selectedInstrPC];
+                    fullAsm = instr.asm;
+                }
+                // Then try stored instruction data from timeline
+                else if (this.selectedInstrData) {
+                    instr = this.selectedInstrData;
+                    fullAsm = instr.asm;
+                }
+                // Finally try compiled machine code
+                else if (this.compiledMachineCode) {
+                    const mc = this.compiledMachineCode.find(m => (m.pc !== undefined ? m.pc : m.line - 1) === this.selectedInstrPC);
+                    if (mc && !mc.error) {
+                        instr = { hex: mc.hex, asm: mc.asm || '----' };
+                        fullAsm = mc.asm || '----';
+                    }
+                }
+                
+                // Try to get full assembly code from editor if available
+                if (!fullAsm || fullAsm === '----') {
+                    const editor = document.getElementById('assembly-editor');
+                    if (editor) {
+                        const lines = editor.value.split('\n');
+                        // Find line that corresponds to this PC
+                        // This is approximate - PC usually matches line number - 1
+                        const lineIndex = this.selectedInstrPC;
+                        if (lineIndex >= 0 && lineIndex < lines.length) {
+                            const line = lines[lineIndex].trim();
+                            if (line && !line.startsWith('#')) {
+                                // Remove comments
+                                const codeOnly = line.split('#')[0].trim();
+                                if (codeOnly) {
+                                    fullAsm = codeOnly;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                if (instr) {
+                    const instrItem = document.getElementById('hz-instr-item');
+                    const instrValue = document.getElementById('hz-instr');
+                    instrItem.style.display = 'block';
+                    // Show full assembly code
+                    const displayAsm = fullAsm || instr.asm || '----';
+                    instrValue.innerHTML = `<span style="color: var(--accent-cyan);">PC ${this.selectedInstrPC}</span> | <span style="color: var(--accent-primary);">${instr.hex}</span> | <span style="color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">${displayAsm}</span>`;
+                }
+            }
+
+            updateControlSignals() {
+                const ctrlStr = this.state.pipeline_regs.id_ex.ctrl || '00000000';
+                const ctrl = parseInt(ctrlStr, 2) || 0;
+
+                const signals = ['regdst', 'alusrc', 'memtoreg', 'regwrite', 'memread', 'memwrite', 'branch', 'jump'];
+                signals.forEach((signal, index) => {
+                    const value = (ctrl >> index) & 1;
+                    const el = document.getElementById('ctrl-' + signal);
+                    el.textContent = value;
+                    el.className = 'info-value' + (value ? ' highlight' : '');
+                });
+            }
+
+            updateRegisters() {
+                const grid = document.getElementById('reg-grid');
+                grid.innerHTML = '';
+                this.state.regfile.forEach(reg => {
+                    const item = document.createElement('div');
+                    item.className = 'reg-item' + (reg.v !== 0 ? ' modified' : '');
+                    item.innerHTML = `
+                        <span class="reg-name">r${reg.r}</span>
+                        <span class="reg-value">${reg.v}</span>
+                    `;
+                    grid.appendChild(item);
+                });
+            }
+
+            updateMemory() {
+                const list = document.getElementById('mem-list');
+                const sortedMem = this.state.data_mem.sort((a, b) => a.addr - b.addr);
+
+                if (sortedMem.length === 0) {
+                    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-text">No data in memory</div></div>';
+                } else {
+                    list.innerHTML = sortedMem.map(m => `
+                        <div class="mem-item">
+                            <span class="mem-addr">[${m.addr}]</span>
+                            <span class="mem-value">${m.v}</span>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            updateMachineCode() {
+                const list = document.getElementById('machine-code-list');
+                if (!list) return;
+
+                let machineCode = null;
+                
+                if (this.compiledMachineCode && this.compiledMachineCode.length > 0) {
+                    machineCode = this.compiledMachineCode;
+                } else if (this.state && this.state.instr_mem && this.state.instr_mem.length > 0) {
+                    machineCode = this.state.instr_mem.map(instr => ({
+                        line: instr.pc + 1,
+                        hex: instr.hex,
+                        binary: parseInt(instr.hex, 16).toString(2).padStart(16, '0'),
+                        value: parseInt(instr.hex, 16),
+                        asm: instr.asm,
+                        pc: instr.pc
+                    }));
+                }
+
+                if (!machineCode || machineCode.length === 0) {
+                    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚡</div><div class="empty-state-text">Write assembly code and click COMPILE</div></div>';
+                    return;
+                }
+
+                list.innerHTML = machineCode.slice(0, 100).map(mc => {
+                    // Skip blank lines - don't show them
+                    if (mc.blank) {
+                        return '';
+                    }
+                    
+                    // Show error lines
+                    if (mc.error || (mc.value === null && !mc.blank)) {
+                        return `
+                            <div class="machine-code-item" style="opacity: 0.5;">
+                                <div class="mc-header">
+                                    <span class="mc-pc">${mc.line - 1}</span>
+                                    <span class="mc-hex" style="color: var(--accent-danger);">ERROR</span>
+                                </div>
+                                <div class="mc-asm" style="color: var(--accent-danger);">Invalid instruction</div>
+                            </div>
+                        `;
+                    }
+
+                    const isCurrent = this.state && mc.pc !== undefined && mc.pc === this.state.pc;
+                    const hex = mc.value;
+                    const binary = mc.binary || hex.toString(2).padStart(16, '0');
+                    const opcode = (hex >> 12) & 0xF;
+                    const formatHtml = this.formatInstruction(binary, opcode);
+                    const pcDisplay = mc.pc !== undefined ? mc.pc : (mc.line - 1);
+
+                    return `
+                        <div class="machine-code-item${isCurrent ? ' current' : ''}">
+                            <div class="mc-header">
+                                <span class="mc-pc">${pcDisplay}</span>
+                                <span class="mc-hex">${mc.hex}</span>
+                                <span class="mc-binary">${binary}</span>
+                            </div>
+                            <div class="mc-asm">${mc.asm || '----'}</div>
+                            ${formatHtml}
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            formatInstruction(binary, opcode) {
+                if (opcode === 0x0) {
+                    return `<div class="mc-format">
+                        <span class="field-value">${binary.substring(0, 4)}</span><span class="field-name">op</span>
+                        <span class="field-value">${binary.substring(4, 7)}</span><span class="field-name">rs</span>
+                        <span class="field-value">${binary.substring(7, 10)}</span><span class="field-name">rt</span>
+                        <span class="field-value">${binary.substring(10, 13)}</span><span class="field-name">rd</span>
+                        <span class="field-value">${binary.substring(13, 16)}</span><span class="field-name">func</span>
+                    </div>`;
+                } else if (opcode === 0x5 || opcode === 0x6) {
+                    return `<div class="mc-format">
+                        <span class="field-value">${binary.substring(0, 4)}</span><span class="field-name">op</span>
+                        <span class="field-value">${binary.substring(4, 16)}</span><span class="field-name">imm12</span>
+                    </div>`;
+                } else {
+                    return `<div class="mc-format">
+                        <span class="field-value">${binary.substring(0, 4)}</span><span class="field-name">op</span>
+                        <span class="field-value">${binary.substring(4, 7)}</span><span class="field-name">rs</span>
+                        <span class="field-value">${binary.substring(7, 10)}</span><span class="field-name">rt</span>
+                        <span class="field-value">${binary.substring(10, 16)}</span><span class="field-name">imm6</span>
+                    </div>`;
+                }
+            }
+
+            updateTimeline() {
+                const tbody = document.getElementById('timeline-body');
+                const thead = document.getElementById('timeline-header');
+                const timelineWrapper = document.getElementById('timeline-wrapper');
+
+                // Fixed visible window of 16 columns
+                const VISIBLE_COLUMNS = 16;
+
+                // Get instruction data from either loaded program or compiled machine code
+                let instrDataList = [];
+                let maxInstrPC = -1;
+                const currentCycle = this.state ? this.state.cycle : 0;
+
+                // First try loaded program (instr_mem)
+                if (this.state && this.state.instr_mem && this.state.instr_mem.length > 0) {
+                    for (let i = 0; i < this.state.instr_mem.length; i++) {
+                        if (this.state.instr_mem[i] && this.state.instr_mem[i].hex !== '0000') {
+                            instrDataList.push({
+                                pc: i,
+                                hex: this.state.instr_mem[i].hex,
+                                asm: this.state.instr_mem[i].asm,
+                                value: parseInt(this.state.instr_mem[i].hex, 16)
+                            });
+                            maxInstrPC = i;
+                        }
+                    }
+                }
+                
+                // If no loaded program, use compiled machine code
+                if (instrDataList.length === 0 && this.compiledMachineCode && this.compiledMachineCode.length > 0) {
+                    for (let i = 0; i < this.compiledMachineCode.length; i++) {
+                        const mc = this.compiledMachineCode[i];
+                        if (mc && !mc.error && mc.value !== null) {
+                            const pc = mc.pc !== undefined ? mc.pc : i;
+                            instrDataList.push({
+                                pc: pc,
+                                hex: mc.hex,
+                                asm: mc.asm || '----',
+                                value: mc.value
+                            });
+                            if (pc > maxInstrPC) maxInstrPC = pc;
+                        }
+                    }
+                }
+
+                if (instrDataList.length === 0) {
+                    if (tbody) tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;color:var(--text-muted);padding:30px;">Compile or load a program to see pipeline timeline</td></tr>';
+                    return;
+                }
+
+                // Calculate the visible window start (shifts when currentCycle > 14)
+                // Cycle 1-14: window starts at 1
+                // Cycle 15: window starts at 2
+                // Cycle 16: window starts at 3, etc.
+                let windowStart;
+                if (currentCycle <= 14) {
+                    windowStart = 1;
+                } else {
+                    windowStart = currentCycle - 13;
+                }
+                
+                // Total cycles to show: from 1 to max needed (for scroll history)
+                const minCycle = 1;
+                const maxCycle = Math.max(windowStart + VISIBLE_COLUMNS - 1, currentCycle + 5, maxInstrPC + 10);
+
+                // Build instructions stage map for all cycles
+                const instructions = {};
+                for (const instrData of instrDataList) {
+                    const pc = instrData.pc;
+                    instructions[pc] = {};
+                    const startCycle = pc + 1;
+                    
+                    // Track stages through pipeline (only if program is loaded and running)
+                    if (this.state && this.state.instr_mem) {
+                        if (startCycle <= currentCycle) instructions[pc][startCycle] = 'IF';
+                        if (startCycle + 1 <= currentCycle) instructions[pc][startCycle + 1] = 'ID';
+                        if (startCycle + 2 <= currentCycle) instructions[pc][startCycle + 2] = 'EX';
+                        if (startCycle + 3 <= currentCycle) instructions[pc][startCycle + 3] = 'MEM';
+                        if (startCycle + 4 <= currentCycle) instructions[pc][startCycle + 4] = 'WB';
+                    }
+                }
+
+                // Update header with all cycles (scrollable)
+                if (thead) {
+                    const headerRow = thead.querySelector('tr');
+                    if (headerRow) {
+                        headerRow.innerHTML = '<th>INSTR</th>';
+                        for (let cycle = minCycle; cycle <= maxCycle; cycle++) {
+                            const header = document.createElement('th');
+                            header.textContent = `${cycle}`;
+                            header.id = `cycle-header-${cycle}`;
+                            if (cycle === currentCycle) {
+                                header.className = 'current';
+                            }
+                            headerRow.appendChild(header);
+                        }
+                    }
+                }
+
+                // Build table rows with all cycles
+                if (tbody) {
+                    tbody.innerHTML = '';
+                    for (const instrData of instrDataList) {
+                        const pc = instrData.pc;
+                        const asmDisplay = instrData.asm.length > 18 ? instrData.asm.substring(0, 18) + '…' : instrData.asm;
+                        let cells = `<td class="instr-row-header" data-pc="${pc}" style="cursor: pointer;"><span class="instr-label">${pc}</span><span class="instr-hex">${instrData.hex}</span><span class="instr-asm">${asmDisplay}</span></td>`;
+
+                        for (let cycle = minCycle; cycle <= maxCycle; cycle++) {
+                            const stage = instructions[pc] ? instructions[pc][cycle] : null;
+                            if (stage) {
+                                cells += `<td><span class="stage-cell stage-${stage.toLowerCase()}" data-pc="${pc}" data-cycle="${cycle}" data-stage="${stage}">${stage}</span></td>`;
+                            } else {
+                                cells += '<td></td>';
+                            }
+                        }
+
+                        const row = document.createElement('tr');
+                        row.innerHTML = cells;
+                        
+                        // Add click listener to instruction row
+                        const instrHeader = row.querySelector('.instr-row-header');
+                        if (instrHeader) {
+                            instrHeader.addEventListener('click', () => {
+                                this.selectInstruction(pc, instrData);
+                            });
+                            
+                            // Highlight selected instruction
+                            if (this.selectedInstrPC === pc) {
+                                instrHeader.style.background = 'var(--bg-elevated)';
+                                instrHeader.style.borderLeft = '3px solid var(--accent-primary)';
+                            }
+                        }
+                        
+                        tbody.appendChild(row);
+                    }
+                }
+
+                // Auto-scroll to keep current window visible (windowStart position)
+                // But allow user to scroll manually
+                setTimeout(() => {
+                    if (timelineWrapper && currentCycle > 0) {
+                        const targetHeader = document.getElementById(`cycle-header-${windowStart}`);
+                        if (targetHeader) {
+                            const headerLeft = targetHeader.offsetLeft;
+                            const instrColumnWidth = 140; // INSTR column width
+                            const targetScrollLeft = headerLeft - instrColumnWidth - 8; // 8px padding
+                            
+                            // Only auto-scroll if we're not manually scrolling
+                            // Check if current scroll is far from target
+                            const currentScroll = timelineWrapper.scrollLeft;
+                            const scrollDiff = Math.abs(currentScroll - targetScrollLeft);
+                            
+                            // Auto-scroll when cycle advances (difference threshold)
+                            if (scrollDiff > 50 || currentCycle <= 14) {
+                                timelineWrapper.scrollTo({
+                                    left: Math.max(0, targetScrollLeft),
+                                    behavior: 'smooth'
+                                });
+                            }
+                        }
+                    }
+                }, 50);
+
+                this.addTooltipListeners();
+            }
+
+            addTooltipListeners() {
+                const cells = document.querySelectorAll('#timeline-table .stage-cell[data-stage]');
+                const tooltip = document.getElementById('tooltip');
+
+                cells.forEach(cell => {
+                    const newCell = cell.cloneNode(true);
+                    cell.parentNode.replaceChild(newCell, cell);
+
+                    newCell.addEventListener('mouseenter', (e) => {
+                        const pc = parseInt(newCell.dataset.pc);
+                        const cycle = parseInt(newCell.dataset.cycle);
+                        const stage = newCell.dataset.stage;
+                        
+                        // Get instruction data from state or compiled code
+                        let instr = null;
+                        if (this.state && this.state.instr_mem && this.state.instr_mem[pc]) {
+                            instr = this.state.instr_mem[pc];
+                        } else if (this.compiledMachineCode) {
+                            const mc = this.compiledMachineCode.find(m => (m.pc !== undefined ? m.pc : m.line - 1) === pc);
+                            if (mc && !mc.error) {
+                                instr = { hex: mc.hex, asm: mc.asm || '----' };
+                            }
+                        }
+
+                        if (!instr) return;
+
+                        let content = `
+                            <div class="tooltip-title">Cycle ${cycle} — ${stage} Stage</div>
+                            <div class="tooltip-content">
+                                <div class="tooltip-row"><span class="tooltip-label">PC</span><span class="tooltip-value">${pc}</span></div>
+                                <div class="tooltip-row"><span class="tooltip-label">Hex</span><span class="tooltip-value">${instr.hex}</span></div>
+                                <div class="tooltip-row"><span class="tooltip-label">Instruction</span><span class="tooltip-value">${instr.asm}</span></div>
+                        `;
+
+                        if (stage === 'EX' && this.state && this.state.stage_info && this.state.stage_info.ex) {
+                            content += `
+                                <div class="tooltip-row"><span class="tooltip-label">Forward A</span><span class="tooltip-value">${this.state.hazards.forward_a}</span></div>
+                                <div class="tooltip-row"><span class="tooltip-label">Forward B</span><span class="tooltip-value">${this.state.hazards.forward_b}</span></div>
+                            `;
+                        }
+
+                        content += '</div>';
+                        tooltip.innerHTML = content;
+                        tooltip.style.display = 'block';
+
+                        const rect = newCell.getBoundingClientRect();
+                        let left = rect.right + 12;
+                        let top = rect.top;
+
+                        if (left + 220 > window.innerWidth) {
+                            left = rect.left - 220;
+                        }
+                        if (top + 150 > window.innerHeight) {
+                            top = window.innerHeight - 160;
+                        }
+
+                        tooltip.style.left = left + 'px';
+                        tooltip.style.top = top + 'px';
+                    });
+
+                    newCell.addEventListener('mouseleave', () => {
+                        tooltip.style.display = 'none';
+                    });
+                });
+            }
+
+            showStatus(message, type = '') {
+                const status = document.getElementById('status');
+                status.textContent = message;
+                status.className = type;
+                status.style.display = 'block';
+                setTimeout(() => status.style.display = 'none', 2500);
+            }
+
+            showErrors(errors) {
+                const errorPanel = document.getElementById('error-panel');
+                const errorList = document.getElementById('error-list');
+                const errorCount = document.getElementById('error-count');
+                
+                if (!errorPanel || !errorList || !errorCount) return;
+                
+                errorCount.textContent = errors.length;
+                errorPanel.classList.add('visible');
+                
+                // Clear previous errors
+                errorList.innerHTML = '';
+                
+                // Add each error
+                errors.forEach(error => {
+                    const errorItem = document.createElement('div');
+                    errorItem.className = 'error-item';
+                    
+                    const line = error.line || 0;
+                    const message = error.message || 'Unknown error';
+                    const source = error.source || '';
+                    
+                    errorItem.innerHTML = `
+                        <div class="error-item-line">
+                            <span class="error-line-number">Satır ${line}:</span>
+                            <span class="error-message">${this.escapeHtml(message)}</span>
+                        </div>
+                        ${source ? `<div class="error-source">${this.escapeHtml(source)}</div>` : ''}
+                    `;
+                    
+                    // Click to scroll to line in editor
+                    errorItem.addEventListener('click', () => {
+                        this.scrollToLine(line);
+                    });
+                    
+                    errorList.appendChild(errorItem);
+                });
+            }
+
+            hideErrors() {
+                const errorPanel = document.getElementById('error-panel');
+                if (errorPanel) {
+                    errorPanel.classList.remove('visible');
+                }
+                // Don't clear error lines when hiding panel - keep them visible
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            scrollToLine(lineNumber) {
+                const editor = document.getElementById('assembly-editor');
+                if (!editor) return;
+                
+                const lines = editor.value.split('\n');
+                let charIndex = 0;
+                for (let i = 0; i < lineNumber - 1 && i < lines.length; i++) {
+                    charIndex += lines[i].length + 1; // +1 for newline
+                }
+                
+                editor.focus();
+                editor.setSelectionRange(charIndex, charIndex);
+                
+                // Scroll to line
+                const lineHeight = 20; // Approximate line height
+                const scrollTop = (lineNumber - 1) * lineHeight;
+                editor.scrollTop = Math.max(0, scrollTop - 100);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            window.cpuSim = new CPUSimulator();
+        });
+    </script>
+</body>
+</html>
