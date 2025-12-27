@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CPU Pipeline Simulator</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23000'/%3E%3Ctext x='8' y='11' font-size='8' text-anchor='middle' fill='%2358a6ff' font-family='Arial, sans-serif'%3ECPU%3C/text%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -92,6 +93,8 @@
             padding: 12px 24px;
             background: var(--bg-secondary);
             border-bottom: 1px solid var(--border-primary);
+            position: relative;
+            flex-wrap: wrap;
         }
 
         .btn-group {
@@ -100,6 +103,7 @@
             background: var(--bg-tertiary);
             border-radius: 8px;
             padding: 2px;
+            flex: 0 0 auto;
         }
 
         button {
@@ -169,6 +173,81 @@
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 1px;
+        }
+
+        .stat-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--bg-tertiary);
+            padding: 6px 10px;
+            border-radius: 10px;
+            border: 1px solid var(--border-primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        .connection-pill {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border-primary);
+            background: var(--bg-tertiary);
+            font-size: 12px;
+            color: var(--text-secondary);
+            box-shadow: var(--shadow-sm);
+            min-height: 36px;
+            flex: 0 0 auto;
+        }
+
+        .connection-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.06);
+        }
+
+        .connection-pill.connected .connection-dot {
+            background: var(--accent-success);
+            box-shadow: 0 0 0 3px rgba(63, 185, 80, 0.15);
+        }
+
+        .connection-pill.reconnecting .connection-dot {
+            background: var(--accent-warning);
+            box-shadow: 0 0 0 3px rgba(210, 153, 34, 0.15);
+        }
+
+        .connection-pill.error .connection-dot {
+            background: var(--accent-danger);
+            box-shadow: 0 0 0 3px rgba(248, 81, 73, 0.12);
+        }
+
+        .connection-label {
+            font-weight: 600;
+            letter-spacing: 0.2px;
         }
 
         input[type="range"] {
@@ -974,7 +1053,7 @@
         #status {
             position: fixed;
             bottom: 24px;
-            right: 520px; /* Move left when error panel is visible */
+            right: 24px;
             background: var(--bg-elevated);
             color: var(--text-primary);
             padding: 14px 20px;
@@ -990,8 +1069,7 @@
         }
 
         /* Adjust status position when error panel is visible */
-        .error-panel.visible ~ #status,
-        body:has(.error-panel.visible) #status {
+        body.error-panel-open #status {
             right: 520px;
         }
 
@@ -1242,6 +1320,10 @@
             <input type="range" id="hz-slider" min="1" max="100" value="10">
             <span class="speed-value"><span id="hz-value">10</span> Hz</span>
         </div>
+        <div class="connection-pill reconnecting" id="connection-pill" title="WebSocket bağlantı durumu">
+            <span class="connection-dot"></span>
+            <span class="connection-label" id="connection-label">Bağlanıyor…</span>
+        </div>
     </div>
 
     <!-- Main Content -->
@@ -1488,6 +1570,7 @@ sub r5, r3, r2      # r5 = r3 - r2 = 5</textarea>
         class CPUSimulator {
             constructor() {
                 this.ws = null;
+                this.reconnectTimer = null;
                 this.state = null;
                 this.activeTab = 'assembly';
                 this.compiledMachineCode = null;
@@ -1497,6 +1580,8 @@ sub r5, r3, r2      # r5 = r3 - r2 = 5</textarea>
             }
 
             init() {
+                this.setConnectionStatus('connecting');
+                this.setControlsDisabled(true);
                 this.connectWebSocket();
                 this.setupEventListeners();
                 this.setupTabs();
@@ -1614,6 +1699,12 @@ sub r5, r3, r2      # r5 = r3 - r2 = 5</textarea>
                 this.ws = new WebSocket(wsUrl);
 
                 this.ws.onopen = () => {
+                    if (this.reconnectTimer) {
+                        clearTimeout(this.reconnectTimer);
+                        this.reconnectTimer = null;
+                    }
+                    this.setConnectionStatus('connected');
+                    this.setControlsDisabled(false);
                     this.showStatus('Connected to CPU', 'success');
                 };
 
@@ -1623,11 +1714,21 @@ sub r5, r3, r2      # r5 = r3 - r2 = 5</textarea>
                 };
 
                 this.ws.onclose = () => {
-                    setTimeout(() => this.connectWebSocket(), 2000);
+                    this.setConnectionStatus('reconnecting');
+                    this.setControlsDisabled(true);
+                    this.showStatus('Connection lost, retrying...', 'error');
+                    if (!this.reconnectTimer) {
+                        this.reconnectTimer = setTimeout(() => {
+                            this.reconnectTimer = null;
+                            this.connectWebSocket();
+                        }, 2000);
+                    }
                 };
 
                 this.ws.onerror = (error) => {
                     console.error('WebSocket error:', error);
+                    this.setConnectionStatus('error');
+                    this.showStatus('WebSocket error, please wait…', 'error');
                 };
             }
 
@@ -1727,6 +1828,9 @@ sub r5, r3, r2      # r5 = r3 - r2 = 5</textarea>
             send(data) {
                 if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                     this.ws.send(JSON.stringify(data));
+                } else {
+                    this.showStatus('Bağlantı yok, yeniden bağlanılıyor...', 'error');
+                    this.setConnectionStatus('reconnecting');
                 }
             }
 
@@ -2398,6 +2502,36 @@ sub r5, r3, r2      # r5 = r3 - r2 = 5</textarea>
                 setTimeout(() => status.style.display = 'none', 2500);
             }
 
+            setConnectionStatus(state) {
+                const pill = document.getElementById('connection-pill');
+                const label = document.getElementById('connection-label');
+                if (!pill || !label) return;
+
+                pill.classList.remove('connected', 'reconnecting', 'error');
+                if (state === 'connected') {
+                    pill.classList.add('connected');
+                    label.textContent = 'Bağlandı';
+                } else if (state === 'reconnecting') {
+                    pill.classList.add('reconnecting');
+                    label.textContent = 'Yeniden bağlanıyor…';
+                } else if (state === 'error') {
+                    pill.classList.add('error');
+                    label.textContent = 'Bağlantı hatası';
+                } else {
+                    label.textContent = 'Bağlanıyor…';
+                    pill.classList.add('reconnecting');
+                }
+            }
+
+            setControlsDisabled(disabled) {
+                const controls = document.querySelectorAll('.controls-bar button, #hz-slider');
+                controls.forEach(ctrl => {
+                    ctrl.disabled = disabled;
+                    ctrl.style.opacity = disabled ? 0.5 : 1;
+                    ctrl.style.cursor = disabled ? 'not-allowed' : 'pointer';
+                });
+            }
+
             showErrors(errors) {
                 const errorPanel = document.getElementById('error-panel');
                 const errorList = document.getElementById('error-list');
@@ -2407,6 +2541,7 @@ sub r5, r3, r2      # r5 = r3 - r2 = 5</textarea>
                 
                 errorCount.textContent = errors.length;
                 errorPanel.classList.add('visible');
+                document.body.classList.add('error-panel-open');
                 
                 // Clear previous errors
                 errorList.innerHTML = '';
@@ -2442,6 +2577,7 @@ sub r5, r3, r2      # r5 = r3 - r2 = 5</textarea>
                 if (errorPanel) {
                     errorPanel.classList.remove('visible');
                 }
+                document.body.classList.remove('error-panel-open');
                 // Don't clear error lines when hiding panel - keep them visible
             }
 
