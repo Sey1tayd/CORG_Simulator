@@ -86,6 +86,7 @@ class ID_EX:
 class EX_MEM:
     """EX/MEM pipeline register"""
     def __init__(self):
+        self.pc = 0
         self.instr = 0
         self.branch_target = 0
         self.zero = False
@@ -95,6 +96,7 @@ class EX_MEM:
         self.ctrl = 0
         
     def reset(self):
+        self.pc = 0
         self.instr = 0
         self.branch_target = 0
         self.zero = False
@@ -102,8 +104,9 @@ class EX_MEM:
         self.read_data2 = 0
         self.dest_reg = 0
         self.ctrl = 0
-    
-    def write(self, instr, branch_target, zero, alu_result, rd2, dest_reg, ctrl):
+
+    def write(self, pc, instr, branch_target, zero, alu_result, rd2, dest_reg, ctrl):
+        self.pc = pc
         self.instr = instr
         self.branch_target = branch_target
         self.zero = zero
@@ -111,9 +114,10 @@ class EX_MEM:
         self.read_data2 = rd2
         self.dest_reg = dest_reg
         self.ctrl = ctrl
-    
+
     def to_dict(self):
         return {
+            'pc': self.pc,
             'instr': self.instr,
             'instr_hex': f"{self.instr:04X}",
             'branch_target': self.branch_target,
@@ -128,6 +132,7 @@ class EX_MEM:
 class MEM_WB:
     """MEM/WB pipeline register"""
     def __init__(self):
+        self.pc = 0
         self.instr = 0
         self.mem_data = 0
         self.alu_result = 0
@@ -135,21 +140,24 @@ class MEM_WB:
         self.ctrl = 0
         
     def reset(self):
+        self.pc = 0
         self.instr = 0
         self.mem_data = 0
         self.alu_result = 0
         self.dest_reg = 0
         self.ctrl = 0
-    
-    def write(self, instr, mem_data, alu_result, dest_reg, ctrl):
+
+    def write(self, pc, instr, mem_data, alu_result, dest_reg, ctrl):
+        self.pc = pc
         self.instr = instr
         self.mem_data = mem_data
         self.alu_result = alu_result
         self.dest_reg = dest_reg
         self.ctrl = ctrl
-    
+
     def to_dict(self):
         return {
+            'pc': self.pc,
             'instr': self.instr,
             'instr_hex': f"{self.instr:04X}",
             'mem_data': self.mem_data,
@@ -157,4 +165,3 @@ class MEM_WB:
             'dest_reg': self.dest_reg,
             'ctrl': f"{self.ctrl:08b}"
         }
-
