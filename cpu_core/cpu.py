@@ -321,6 +321,7 @@ class CPU:
         
         # Write to EX/MEM
         self.ex_mem.write(
+            ex_pc,     # PC of this instruction
             ex_instr,  # Instruction for display
             branch_target,
             zero,
@@ -369,7 +370,8 @@ class CPU:
         
         # Write to MEM/WB
         self.mem_wb.write(
-            mem_instr,  # Instruction for display
+            self.ex_mem.pc,  # PC of this instruction
+            mem_instr,       # Instruction for display
             mem_data,
             self.ex_mem.alu_result,
             self.ex_mem.dest_reg,
@@ -378,7 +380,7 @@ class CPU:
         
         # Stage info
         self.stage_info['mem'] = {
-            'pc': 0,  # PC not needed for display, instruction is stored
+            'pc': self.ex_mem.pc,
             'instr': mem_instr,
             'instr_hex': f"{mem_instr:04X}",
             'asm': Disassembler.disassemble(mem_instr) if mem_instr != 0 else 'nop',
@@ -407,7 +409,7 @@ class CPU:
         
         # Stage info
         self.stage_info['wb'] = {
-            'pc': 0,  # PC not needed for display, instruction is stored
+            'pc': self.mem_wb.pc,
             'instr': wb_instr,
             'instr_hex': f"{wb_instr:04X}",
             'asm': Disassembler.disassemble(wb_instr) if wb_instr != 0 else 'nop',
@@ -449,4 +451,3 @@ class CPU:
             'regfile': [{'r': i, 'v': self.regs[i]} for i in range(8)],
             'data_mem': [{'addr': i, 'v': self.data_mem[i]} for i in range(256) if self.data_mem[i] != 0],
         }
-
